@@ -68,19 +68,9 @@ program stableswap3.aleo {
         pool_key: field
     }
 
-    struct Pool2Info {
-        id: field, // hash(token1.id, token2.id)
-        token1_id: u64,
-        token2_id: u64,
-        reserve1: u128,
-        reserve2: u128,
-        ampl_coef: u128,
-        lp_total_supply: u128,
-        swap_fee: u128, // 10000 based, 1 = 0.01% = 0.0001
-    }
 
-    struct Pool3Info {
-        id: field, // hash(token1.id, token2.id)
+    struct PoolInfo {
+        id: field, // hash(token1.id, token2.id, token3.id)
         token1_id: u64,
         token2_id: u64,
         token3_id: u64,
@@ -88,6 +78,7 @@ program stableswap3.aleo {
         reserve2: u128,
         reserve3: u128,
         lp_total_supply: u128,
+        ampl_coef: u128,
         swap_fee: u128, // 10000 based, 1 = 0.01% = 0.0001
     }
 
@@ -97,14 +88,7 @@ program stableswap3.aleo {
         deposit_id: field,
     }
 
-    record LpToken2Receipt {
-        owner: address,
-        token1_id: u64,
-        token2_id: u64,
-        deposit_id: field
-    }
-
-    record LpToken3Receipt {
+    record LpTokenReceipt {
         owner: address,
         token1_id: u64,
         token2_id: u64,
@@ -124,9 +108,8 @@ program stableswap3.aleo {
         voucher: field,
     }
 
-    mapping amm_pools: field => Pool2Info; // PoolInfo by hash(token1.id, token2.id)
+    mapping amm_pools: field => PoolInfo; // PoolInfo by hash(token1.id, token2.id, token3.id)
     mapping amm_deposits: field => u128; // lp deposit amount by hash(id, pool_key)
-    mapping amm_extras: field => ExtraAmount; // extra amount by voucher_id
 
     inline min_u128(a: u128, b: u128) -> u128 {
         return a < b ? a : b;
@@ -149,8 +132,9 @@ program stableswap3.aleo {
         return BHP256::hash_to_field(PoolKey {token1: actual_token1, token2: actual_token2, token3: actual_token3});
     }
 
-    function get_d2(data: Pool2Info) -> u128 {
-        let S: u128 = data.reserve1 + data.reserve2;
+    
+    inline get_d(pool: PoolInfo) -> u128 {
+        let S: u128 = pool.reserve1 + pool.reserve2 + pool.reserve3;
 
         if (S == 0u128) {
             return 0u128;
@@ -158,15 +142,16 @@ program stableswap3.aleo {
 
         let D_prev: u128 = 0u128;
         let D: u128 = S;
-        let Ann: u128 = data.ampl_coef * 2u128;
+        let Ann: u128 = pool.ampl_coef * 3u128;
 
         for i: u8 in 0u8..255u8 {
             let D_P: u128 = D;
-            D_P = D_P * D / (data.reserve1 * 2u128);
-            D_P = D_P * D / (data.reserve2 * 2u128);
+            D_P = D_P * D / (pool.reserve1 * 3u128);
+            D_P = D_P * D / (pool.reserve2 * 3u128);
+            D_P = D_P * D / (pool.reserve3 * 3u128);
 
             D_prev = D;
-            D = (Ann * S + D_P * 2u128) * D / ((Ann - 1u128) * D + 3u128 * D_P);
+            D = (Ann * S + D_P * 3u128) * D / ((Ann - 1u128) * D + 4u128 * D_P);
         
 
             if (D > D_prev){
@@ -184,12 +169,59 @@ program stableswap3.aleo {
         return D;
     }
 
-    // function get_y (token1: u64, token2: u64, x: u128) -> u128 {
-    //     assert(token1 != token2 && token1 != 0u64 && token2 != 0u64);
+    inline get_y (pool: PoolInfo, id: u64, x: u128) -> u128 {
+        assert(pool.token1_id != pool.token2_id && pool.token1_id != 0u64 && pool.token2_id != 0u64);
         
-    //     let d: u128 = get_d(1, 2, 0);
-    // }
+        
+        let D: u128 = get_d(pool);
+        let c: u128 = D;
+        let Ann: u128 = pool.ampl_coef;
+        let S: u128 = 0u128;
 
+        if (pool.token1_id == id) {
+            S = x + pool.reserve2 + pool.reserve3;
+            c = c * D / (x * 3u128);
+            c = c * D / (pool.reserve2 * 3u128);
+            c = c * D / (pool.reserve3 * 3u128);
+        }
+
+        if (pool.token2_id == id) {
+            S = x + pool.reserve1 + pool.reserve3;
+            c = c * D / (x * 3u128);
+            c = c * D / (pool.reserve1 * 3u128);
+            c = c * D / (pool.reserve3 * 3u128);
+        }
+
+        if (pool.token3_id == id) {
+            S = x + pool.reserve1 + pool.reserve2;
+            c = c * D / (x * 3u128);
+            c = c * D / (pool.reserve1 * 3u128);
+            c = c * D / (pool.reserve2 * 3u128);
+        }
+
+        c = c * D / (Ann * 3u128);
+
+        let b: u128 = S + D / Ann;
+        let y_prev: u128 = 0u128;
+        let y: u128 = D;
+
+        for i: u8 in 0u8..255u8 {
+            y_prev = y;
+            y = (y*y + c) / (2u128 * y + b - D);
+        
+            if (y > y_prev) {
+                if (y - y_prev <= 1u128) {
+                    return y;
+                }
+            }
+            if (y <= y_prev) {
+                if (y_prev - y <= 1u128) {
+                    return y;
+                }
+            }
+        }
+        return y;
+    }
     
 
     transition transfer_pool_ownership(poolAdmin: PoolAdmin, to: address) -> (PoolAdmin) {

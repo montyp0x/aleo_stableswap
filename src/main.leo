@@ -114,12 +114,10 @@ program stableswap.aleo {
         return BHP256::hash_to_field(PoolKey {token1: actual_token1, token2: actual_token2});
     }
 
-    
-
     inline get_d(pool: PoolInfo) -> u128 {
         let S: u128 = pool.reserve1 + pool.reserve2;
 
-        if (S == 0u128) {
+        if (S == 0u128) {   
             return 0u128;
         }
 
@@ -151,7 +149,7 @@ program stableswap.aleo {
         return D;
     }
 
-    inline get_y (pool: PoolInfo, i: u64, x: u128) -> u128 {
+    inline get_y (pool: PoolInfo, id: u64, x: u128) -> u128 {
         assert(pool.token1_id != pool.token2_id && pool.token1_id != 0u64 && pool.token2_id != 0u64);
         
         
@@ -159,6 +157,20 @@ program stableswap.aleo {
         let c: u128 = D;
         let Ann: u128 = pool.ampl_coef;
         let S: u128 = 0u128;
+
+        if (pool.token1_id == id) {
+            S = x + pool.reserve2;
+            c = c * D / (x * 2u128);
+            c = c * D / (pool.reserve2 * 2u128);
+        }
+
+        if (pool.token2_id == id) {
+            S = x + pool.reserve1;
+            c = c * D / (x * 2u128);
+            c = c * D / (pool.reserve1 * 2u128);
+        }
+
+
 
         c = c * D / (Ann * 2u128);
 
@@ -302,8 +314,6 @@ program stableswap.aleo {
 
         let lp: u128 = min_u128(new_lp1, new_lp2);
 
-        // TODO check min_token1_amount & min_token2_amount
-
         let updated_pool: PoolInfo = PoolInfo {
             id: pool.id,
             token1_id: pool.token1_id,
@@ -321,7 +331,6 @@ program stableswap.aleo {
     }
     
     transition remove_liquidity(receiver: address, lp_receipt: LpTokenReceipt, token1_amount: u128, token2_amount: u128) -> (Token, Token) {
-        
         let token1: Token = Token {
             owner: receiver,
             amount: token1_amount,
@@ -332,7 +341,6 @@ program stableswap.aleo {
             amount: token2_amount,
             token_id: lp_receipt.token2_id
         };
-
 
         return (token1, token2) then finalize(lp_receipt.deposit_id, 
                 lp_receipt.token1_id, lp_receipt.token2_id, token1_amount, token2_amount);
