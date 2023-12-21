@@ -172,7 +172,6 @@ program stableswap3.aleo {
     inline get_y (pool: PoolInfo, id: u64, x: u128) -> u128 {
         assert(pool.token1_id != pool.token2_id && pool.token1_id != 0u64 && pool.token2_id != 0u64);
         
-        
         let D: u128 = get_d(pool);
         let c: u128 = D;
         let Ann: u128 = pool.ampl_coef;
@@ -230,6 +229,73 @@ program stableswap3.aleo {
             owner: to,
             pool_key: poolAdmin.pool_key
         };
+    }
+
+
+    transition create_pool(owner: address, token1: Token, initial_amount1: u128, token2: Token, initial_amount2: u128, token3: Token, initial_amount3: u128, ampl_coef: u128, swap_fee: u128) -> (PoolAdmin, Token, Token, Token) {
+        assert(initial_amount1 > 0u128 && initial_amount2 > 0u128 && initial_amount3 > 0u128);
+        assert(swap_fee <= 10000u128); // 10000 based, 1 = 0.01% = 0.0001
+        assert(token1.token_id != token2.token_id && token1.token_id != token3.token_id && token2.token_id != token3.token_id);
+        assert(token1.amount >= initial_amount1 && token2.amount >= initial_amount2);
+
+        let change1: Token = Token {
+            owner: owner,
+            token_id: token1.token_id,
+            amount: token1.amount - initial_amount1
+        };
+
+        let change2: Token = Token {
+            owner: owner,
+            token_id: token2.token_id,
+            amount: token2.amount - initial_amount2
+        };
+
+        let change3: Token = Token {
+            owner: owner,
+            token_id: token3.token_id,
+            amount: token3.amount - initial_amount3
+        };
+
+        if (token1.token_id < token2.token_id) {
+
+        }
+
+
+        let actual_token1: Token = token1.token_id > token2.token_id ? (token2.token_id > token3.token_id ? token3 : token2) : (token1.token_id > token3.token_id ? token3 : token1);
+        let actual_token3: Token = token1.token_id > token2.token_id ? (token1.token_id > token3.token_id ? token1 : token3) : (token2.token_id > token3.token_id ? token2 : token3);
+        // let actual_token2: Token = (actual_token1.id < token1.token_id && token1.token_id < actual_token3.id) ? (token2.token_id > token3.token_id ? token3 : token2) : token1;
+        
+        // let actual_amount1: u128 = token1.token_id > token2.token_id ? initial_amount2 : initial_amount1;
+        // let actual_amount2: u128 = token1.token_id < token2.token_id ? initial_amount2 : initial_amount1;
+        // let actual_amount3: u128 = token1.token_id < token2.token_id ? initial_amount2 : initial_amount1;
+        
+        let pool_key: field = get_pool_key(actual_token1.token_id, actual_token2.token_id, actual_token3.token_id);
+        let pool_admin: PoolAdmin = PoolAdmin {
+            owner: owner,
+            pool_key: pool_key
+        };
+
+        return (pool_admin, change1, change2, change3) then finalize(pool_key, actual_token1.token_id, actual_amount1, actual_token2.token_id, actual_amount2, actual_token3.token_id, actual_amount3 , ampl_coef, swap_fee);
+    }
+
+    finalize create_pool(pool_key: field, token1_id: u64, token1_amount: u128, token2_id: u64, token2_amount: u128, token3_id: u64, token3_amount: u128, ampl_coef: u128, swap_fee: u128) {
+        assert (!Mapping::contains(amm_pools, pool_key)); // the pool already exists
+
+        let pool: PoolInfo = PoolInfo {
+            id: pool_key, // hash(token1.id, token2.id)
+            token1_id: token1_id,
+            token2_id: token2_id,
+            token3_id: token3_id,
+            reserve1: token1_amount,
+            reserve2: token2_amount,
+            reserve3: token3_amount,
+            lp_total_supply: token1_amount * token2_amount,
+            ampl_coef: ampl_coef,
+            swap_fee: swap_fee, // 10000 based, 1 = 0.01% = 0.0001
+        };
+
+        Mapping::set(amm_pools, pool_key, pool);
+        
     }
 
 }
