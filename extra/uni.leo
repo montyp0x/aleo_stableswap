@@ -1,4 +1,4 @@
-// The 'stableswap' program.
+// The 'uniswap' program.
 
 program uniswap.aleo {
 

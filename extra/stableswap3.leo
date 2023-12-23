@@ -263,11 +263,11 @@ program stableswap3.aleo {
 
         let actual_token1: Token = token1.token_id > token2.token_id ? (token2.token_id > token3.token_id ? token3 : token2) : (token1.token_id > token3.token_id ? token3 : token1);
         let actual_token3: Token = token1.token_id > token2.token_id ? (token1.token_id > token3.token_id ? token1 : token3) : (token2.token_id > token3.token_id ? token2 : token3);
-        // let actual_token2: Token = (actual_token1.id < token1.token_id && token1.token_id < actual_token3.id) ? (token2.token_id > token3.token_id ? token3 : token2) : token1;
+        let actual_token2: Token = (token1.token_id > token2.token_id && token2.token_id > token3.token_id) ? token2 : ((token2.token_id > token1.token_id && token1.token_id > token3.token_id) ? token1 : token3);
         
-        // let actual_amount1: u128 = token1.token_id > token2.token_id ? initial_amount2 : initial_amount1;
-        // let actual_amount2: u128 = token1.token_id < token2.token_id ? initial_amount2 : initial_amount1;
-        // let actual_amount3: u128 = token1.token_id < token2.token_id ? initial_amount2 : initial_amount1;
+        let actual_amount1: u128 = token1.token_id > token2.token_id ? (token2.token_id > token3.token_id ? initial_amount3 : initial_amount2) : (token1.token_id > token3.token_id ? initial_amount3 : initial_amount1);
+        let actual_amount2: u128 = (token1.token_id > token2.token_id && token2.token_id > token3.token_id) ? initial_amount2 : ((token2.token_id > token1.token_id && token1.token_id > token3.token_id) ? initial_amount1 : initial_amount3);
+        let actual_amount3: u128 = token1.token_id > token2.token_id ? (token1.token_id > token3.token_id ? initial_amount1 : initial_amount3) : (token2.token_id > token3.token_id ? initial_amount2 : initial_amount3);
         
         let pool_key: field = get_pool_key(actual_token1.token_id, actual_token2.token_id, actual_token3.token_id);
         let pool_admin: PoolAdmin = PoolAdmin {

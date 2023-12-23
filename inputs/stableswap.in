@@ -1,4 +1,4 @@
 // The program input for stableswap/src/main.leo
 [main]
 public n_coins: u32 = 3u32;
-b: u32 = 2u32;
+
