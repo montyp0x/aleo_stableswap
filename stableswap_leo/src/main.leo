@@ -99,6 +99,10 @@ program stableswap.aleo {
         return a < b ? a : b;
     }
 
+    inline max_u128(a: u128, b: u128) -> u128 {
+        return a > b ? a : b;
+    }
+
     inline min_u64(a: u64, b: u64) -> u64 {
         return a < b ? a : b;
     }
@@ -124,6 +128,7 @@ program stableswap.aleo {
         let D_prev: u128 = 0u128;
         let D: u128 = S;
         let Ann: u128 = ampl_coef * 2u128;
+        
 
         for i: u8 in 0u8..255u8 {
             let D_P: u128 = D;
@@ -131,18 +136,12 @@ program stableswap.aleo {
             D_P = D_P * D / (reserve2 * 2u128);
 
             D_prev = D;
-            // D = (Ann * S + D_P * 2u128) * D / ((Ann - 1u128) * D + 3u128 * D_P);
-        
+            D = (Ann * S + D_P * 2u128) * D / ((Ann - 1u128) * D + 3u128 * D_P);
+            
+            let tmp_res: bool = (max_u128(D, D_prev) - min_u128(D, D_prev) <= 1u128) ? true : false;
 
-            if (D > D_prev){
-                if (D - D_prev <= 1u128) {
-                    return D;
-                }
-            }    
-            if (D <= D_prev){
-                if (D_prev - D <= 1u128) {
-                    return D;
-                }
+            if (tmp_res) {
+                return D;
             }
         }
 
@@ -159,6 +158,7 @@ program stableswap.aleo {
         let D_prev: u128 = 0u128;
         let D: u128 = S;
         let Ann: u128 = ampl_coef * 2u128;
+        
 
         for i: u8 in 0u8..255u8 {
             let D_P: u128 = D;
@@ -167,17 +167,11 @@ program stableswap.aleo {
 
             D_prev = D;
             D = (Ann * S + D_P * 2u128) * D / ((Ann - 1u128) * D + 3u128 * D_P);
-        
+            
+            let tmp_res: bool = (max_u128(D, D_prev) - min_u128(D, D_prev) <= 1u128) ? true : false;
 
-            if (D > D_prev){
-                if (D - D_prev <= 1u128) {
-                    return D;
-                }
-            }    
-            if (D <= D_prev){
-                if (D_prev - D <= 1u128) {
-                    return D;
-                }
+            if (tmp_res) {
+                return D;
             }
         }
 
@@ -191,22 +185,12 @@ program stableswap.aleo {
         let D: u128 = get_d(reserve1, reserve2, ampl_coef);
         
         let c: u128 = D;
-        let Ann: u128 = ampl_coef;
+        let Ann: u128 = ampl_coef * 2u128;
         let S: u128 = 0u128;
 
-        if (token1_id == id) {
-            S = x + reserve2;
-            c = c * D / (x * 2u128);
-            c = c * D / (reserve2 * 2u128);
-        }
-
-        if (token2_id == id) {
-            S = x + reserve1;
-            c = c * D / (x * 2u128);
-            c = c * D / (reserve1 * 2u128);
-        }
-
-
+        S = x;
+        c = c * D / (x * 2u128);
+        
 
         c = c * D / (Ann * 2u128);
 
@@ -217,16 +201,11 @@ program stableswap.aleo {
         for i: u8 in 0u8..255u8 {
             y_prev = y;
             y = (y * y + c) / (2u128 * y + b - D);
-        
-            if (y > y_prev) {
-                if (y - y_prev <= 1u128) {
-                    return y;
-                }
-            }
-            if (y <= y_prev) {
-                if (y_prev - y <= 1u128) {
-                    return y;
-                }
+
+            let tmp_res: bool = (max_u128(y, y_prev) - min_u128(y, y_prev) <= 1u128) ? true : false;
+
+            if (tmp_res) {
+                return y;
             }
         }
         return y;
@@ -399,6 +378,22 @@ program stableswap.aleo {
         Mapping::remove(amm_deposits, deposit_id);
     }
 
+    // transition debug (receiver: address, token_in: Token, token_in_id: u64, token_out_id: u64, amount_in: u128, min_amount_out: u128, reserve1: u128, reserve2: u128, 
+    // token1_id: u64, token2_id: u64, ampl_coef: u128, swap_fee: u128) -> u128 {
+    //     assert(amount_in > 0u128);
+
+    //     let change_amount: u128 = token_in.amount - amount_in;
+
+    //     let reserve_in: u128 = token1_id == token_in_id ? reserve1 : reserve2;
+    //     let reserve_out: u128 = token2_id == token_in_id ? reserve1 : reserve2;
+    //     let fee: u128 = swap_fee;
+
+    //     let amount_in_with_fee: u128 = amount_in * (10000u128 - fee); 
+    //     let x: u128 = amount_in_with_fee + reserve_in;
+
+    //     return reserve;
+    // }
+
     transition exchange (receiver: address, token_in: Token, token_in_id: u64, token_out_id: u64, amount_in: u128, min_amount_out: u128, reserve1: u128, reserve2: u128, 
     token1_id: u64, token2_id: u64, ampl_coef: u128, swap_fee: u128) -> (Token, Token) {
         assert(amount_in > 0u128);
@@ -409,7 +404,7 @@ program stableswap.aleo {
         let reserve_out: u128 = token2_id == token_in_id ? reserve1 : reserve2;
         let fee: u128 = swap_fee;
 
-        let amount_in_with_fee: u128 = amount_in * (10000u128 - fee); 
+        let amount_in_with_fee: u128 = amount_in; // TODO: add fee 
         let x: u128 = amount_in_with_fee + reserve_in;
         let y: u128 = get_y(reserve1, reserve2, ampl_coef, token1_id, token2_id, token_in_id, x);
         
@@ -439,11 +434,16 @@ program stableswap.aleo {
         let reserve_in: u128 = pool.token1_id == token_in_id ? pool.reserve1 : pool.reserve2;
         let reserve_out: u128 = pool.token2_id == token_in_id ? pool.reserve1 : pool.reserve2;
 
-        assert(reserve_in_user > reserve_in ? reserve_in_user - reserve_in < 10u128 : reserve_in - reserve_in_user < 10u128);
-        assert(reserve_out_user > reserve_out ? reserve_out_user - reserve_out < 10u128 : reserve_out - reserve_out_user < 10u128);
+        // let a: u128 = 1u128;
+        // let b: u128 = 2u128;
+        // let c: u128 = a - b;
+        // assert_eq(reserve_in, 1u128); 
+
+        assert(max_u128(reserve_in_user, reserve_in) - min_u128(reserve_in_user, reserve_in) < 10u128);
+        assert(max_u128(reserve_out_user, reserve_out) - min_u128(reserve_out_user, reserve_out) < 10u128);
 
         reserve_in += amount_in;
-        reserve_out += amount_out;
+        reserve_out -= amount_out;
 
         let updated_pool: PoolInfo = PoolInfo {
             id: pool.id,
@@ -590,10 +590,10 @@ program stableswap.aleo {
         return (get_pool_key(1u64, 2u64), get_pool_key(1u64, 3u64), get_pool_key(2u64, 3u64), get_pool_key(2u64, 4u64));
     }
 
-    transition main (n_coins: u32) -> u32 {
+    transition main (n_coins: u32) -> group {
         let actual_token2: u32 = (5u32 > 3u32 && 3u32 > 4u32) ? 3u32 : ((3u32 > 1u32 && 1u32 > 5u32) ? 1u32 : 1u32);
-        
-        return actual_token2;
+        let gr: group = group::GEN; // the group generator
+        return gr;
     }
 
 }
