@@ -11,16 +11,16 @@ interface CurveToken:
 
 
 # This can (and needs to) be changed at compile time
-N_COINS: constant(uint256) = 3  # <- change
+N_COINS: constant(uint256) = 2  # <- change
 
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 LENDING_PRECISION: constant(uint256) = 10 ** 18
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
 
-PRECISION_MUL: constant(uint256[N_COINS]) = [1000000000000, 1000000000000, 1000000000000] # <- change
-RATES: constant(uint256[N_COINS]) = [1000000000000000000000000000000, 1000000000000000000000000000000, 1000000000000000000000000000000] # <- change
+PRECISION_MUL: constant(uint256[N_COINS]) = [1000000000000, 1000000000000] # <- change
+RATES: constant(uint256[N_COINS]) = [1000000000000000000000000000000, 1000000000000000000000000000000] # <- change
 
-FEE_INDEX: constant(uint256) = 3  # Which coin may potentially have fees (USDT)
+FEE_INDEX: constant(uint256) = 2  # Which coin may potentially have fees (USDT)
 
 MAX_ADMIN_FEE: constant(uint256) = 10 * 10 ** 9
 MAX_FEE: constant(uint256) = 5 * 10 ** 9

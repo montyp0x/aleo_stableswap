@@ -49,16 +49,23 @@ PRIVATE_KEY=APrivateKey1zkpDSFPwdJt7QJCVhnjPLQpPQDN57euYHvpW7PGfwB6wGG4
 #     _nonce: 1738483341280375163846743812193292672860569105378494043894154684192972730518group.public
 # }" 1u64 2u64 100000u128 1u128 1000000000u128 1000000000u128 1u64 2u64 100000u128 1u128
 
+# leo run exchange aleo1uyy6uxd3swdalye05jqtuasaxstpacvsdfmknwy92fgy6hyntvyqmpa6jw "{
+#     owner: aleo1uyy6uxd3swdalye05jqtuasaxstpacvsdfmknwy92fgy6hyntvyqmpa6jw.private,
+#     amount: 1000000u128.private,
+#     token_id: 1u64.private,
+#     _nonce: 1738483341280375163846743812193292672860569105378494043894154684192972730518group.public
+# }" 1u64 2u64 100u128 1u128 1000u128 1000u128 1u64 2u64 100u128 1u128
+
+# leo run exchange aleo1uyy6uxd3swdalye05jqtuasaxstpacvsdfmknwy92fgy6hyntvyqmpa6jw "{
+#     owner: aleo1uyy6uxd3swdalye05jqtuasaxstpacvsdfmknwy92fgy6hyntvyqmpa6jw.private,
+#     amount: 999900u128.private,
+#     token_id: 1u64.private,
+#     _nonce: 1738483341280375163846743812193292672860569105378494043894154684192972730518group.public
+# }" 1u64 2u64 900u128 1u128 1100u128 901u128 1u64 2u64 100u128 1u128
+
 leo run exchange aleo1uyy6uxd3swdalye05jqtuasaxstpacvsdfmknwy92fgy6hyntvyqmpa6jw "{
     owner: aleo1uyy6uxd3swdalye05jqtuasaxstpacvsdfmknwy92fgy6hyntvyqmpa6jw.private,
     amount: 1000000u128.private,
     token_id: 1u64.private,
     _nonce: 1738483341280375163846743812193292672860569105378494043894154684192972730518group.public
-}" 1u64 2u64 100u128 1u128 1000u128 1000u128 1u64 2u64 100u128 1u128
-
-leo run exchange aleo1uyy6uxd3swdalye05jqtuasaxstpacvsdfmknwy92fgy6hyntvyqmpa6jw "{
-    owner: aleo1uyy6uxd3swdalye05jqtuasaxstpacvsdfmknwy92fgy6hyntvyqmpa6jw.private,
-    amount: 999900u128.private,
-    token_id: 1u64.private,
-    _nonce: 1738483341280375163846743812193292672860569105378494043894154684192972730518group.public
-}" 1u64 2u64 900u128 1u128 1100u128 901u128 1u64 2u64 100u128 1u128
+}" 1u64 2u64 1000u128 1u128 1100u128 11000u128 1u64 2u64 100u128 1u128

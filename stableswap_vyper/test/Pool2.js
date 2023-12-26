@@ -7,11 +7,11 @@ const {
 
 
 
-describe("StableSwap3Pool", function () {
+describe("StableSwap2Pool", function () {
   async function deployFixture() {
     const [owner, user] = await hre.ethers.getSigners();
 
-    const Pool = await hre.ethers.getContractFactory("StableSwap3Pool");
+    const Pool = await hre.ethers.getContractFactory("StableSwap2Pool");
     const Token = await hre.ethers.getContractFactory("ERC20");
 
     const lpToken = await Token.deploy("LPTOKEN", "LPT", 18);
@@ -77,6 +77,19 @@ describe("StableSwap3Pool", function () {
     await pool.connect(user).exchange(0, 1, 900, 90);
     expect(await tokenA.balanceOf(user.address)).to.equal(999000n);
     expect(await tokenB.balanceOf(user.address)).to.equal(1000933n);
+  });
+
+  it("Add/remove liquidity", async function () {
+    const { pool, tokenA, tokenB, owner, user } = await loadFixture(deployFixture);
+
+    await pool.connect(owner).add_liquidity([100, 10000], 1);
+
+    await pool.connect(user).exchange(0, 1, 1000, 90);
+    console.log(await tokenA.balanceOf(user.address));
+    console.log(await tokenB.balanceOf(user.address));
+
+    
+
   });
 
 

@@ -148,35 +148,35 @@ program stableswap.aleo {
         return D;
     }
 
-    transition get_d2(reserve1: u128, reserve2: u128, ampl_coef: u128) -> u128 {
-        let S: u128 = reserve1 + reserve2;
+    // transition get_d2(reserve1: u128, reserve2: u128, ampl_coef: u128) -> u128 {
+    //     let S: u128 = reserve1 + reserve2;
 
-        if (S == 0u128) {   
-            return 0u128;
-        }
+    //     if (S == 0u128) {   
+    //         return 0u128;
+    //     }
 
-        let D_prev: u128 = 0u128;
-        let D: u128 = S;
-        let Ann: u128 = ampl_coef * 2u128;
+    //     let D_prev: u128 = 0u128;
+    //     let D: u128 = S;
+    //     let Ann: u128 = ampl_coef * 2u128;
         
 
-        for i: u8 in 0u8..255u8 {
-            let D_P: u128 = D;
-            D_P = D_P * D / (reserve1 * 2u128);
-            D_P = D_P * D / (reserve2 * 2u128);
+    //     for i: u8 in 0u8..255u8 {
+    //         let D_P: u128 = D;
+    //         D_P = D_P * D / (reserve1 * 2u128);
+    //         D_P = D_P * D / (reserve2 * 2u128);
 
-            D_prev = D;
-            D = (Ann * S + D_P * 2u128) * D / ((Ann - 1u128) * D + 3u128 * D_P);
+    //         D_prev = D;
+    //         D = (Ann * S + D_P * 2u128) * D / ((Ann - 1u128) * D + 3u128 * D_P);
             
-            let tmp_res: bool = (max_u128(D, D_prev) - min_u128(D, D_prev) <= 1u128) ? true : false;
+    //         let tmp_res: bool = (max_u128(D, D_prev) - min_u128(D, D_prev) <= 1u128) ? true : false;
 
-            if (tmp_res) {
-                return D;
-            }
-        }
+    //         if (tmp_res) {
+    //             return D;
+    //         }
+    //     }
 
-        return D;
-    }
+    //     return D;
+    // }
 
     inline get_y(reserve1: u128, reserve2: u128, ampl_coef: u128, token1_id: u64, token2_id: u64, id: u64, x: u128) -> u128 {
         assert(token1_id != token2_id && token1_id != 0u64 && token2_id != 0u64);

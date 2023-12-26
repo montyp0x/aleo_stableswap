@@ -115,6 +115,10 @@ program stableswap3.aleo {
         return a < b ? a : b;
     }
 
+    inline max_u128(a: u128, b: u128) -> u128 {
+        return a > b ? a : b;
+    }
+
     inline min_u64(a: u64, b: u64) -> u64 {
         return a < b ? a : b;
     }
@@ -133,8 +137,8 @@ program stableswap3.aleo {
     }
 
     
-    inline get_d(pool: PoolInfo) -> u128 {
-        let S: u128 = pool.reserve1 + pool.reserve2 + pool.reserve3;
+    inline get_d(reserve1: u128, reserve2: u128, reserve3: u128, ampl_coef: u128) -> u128 {
+        let S: u128 = reserve1 + reserve2 + reserve3;
 
         if (S == 0u128) {
             return 0u128;
@@ -142,60 +146,53 @@ program stableswap3.aleo {
 
         let D_prev: u128 = 0u128;
         let D: u128 = S;
-        let Ann: u128 = pool.ampl_coef * 3u128;
+        let Ann: u128 = ampl_coef * 3u128;
 
         for i: u8 in 0u8..255u8 {
             let D_P: u128 = D;
-            D_P = D_P * D / (pool.reserve1 * 3u128);
-            D_P = D_P * D / (pool.reserve2 * 3u128);
-            D_P = D_P * D / (pool.reserve3 * 3u128);
+            D_P = D_P * D / (reserve1 * 3u128);
+            D_P = D_P * D / (reserve2 * 3u128);
+            D_P = D_P * D / (reserve3 * 3u128);
 
             D_prev = D;
             D = (Ann * S + D_P * 3u128) * D / ((Ann - 1u128) * D + 4u128 * D_P);
         
+            let tmp_res: bool = (max_u128(D, D_prev) - min_u128(D, D_prev) <= 1u128) ? true : false;
 
-            if (D > D_prev){
-                if (D - D_prev <= 1u128) {
-                    return D;
-                }
-            }    
-            if (D <= D_prev){
-                if (D_prev - D <= 1u128) {
-                    return D;
-                }
+            if (tmp_res) {
+                return D;
             }
         }
 
         return D;
     }
 
-    inline get_y (pool: PoolInfo, id: u64, x: u128) -> u128 {
-        assert(pool.token1_id != pool.token2_id && pool.token1_id != 0u64 && pool.token2_id != 0u64);
+    inline get_y (reserve1: u128, reserve2: u128, reserve3: u128, ampl_coef: u128, id_out: u64, id_in: u64, x: u128) -> u128 {
+        // assert(token1_id != token2_id && token1_id != token3_id && token3_id != token2_id && token1_id != 0u64 && token2_id != 0u64);
         
-        let D: u128 = get_d(pool);
+        let D: u128 = get_d(reserve1, reserve2, reserve3, ampl_coef);
         let c: u128 = D;
-        let Ann: u128 = pool.ampl_coef;
-        let S: u128 = 0u128;
+        let Ann: u128 = ampl_coef;
+        let S: u128 = reserve1 + reserve2 + reserve3;
 
-        if (pool.token1_id == id) {
-            S = x + pool.reserve2 + pool.reserve3;
-            c = c * D / (x * 3u128);
-            c = c * D / (pool.reserve2 * 3u128);
-            c = c * D / (pool.reserve3 * 3u128);
-        }
+        let coins: [u128; 3] = [reserve1, reserve2, reserve3];
 
-        if (pool.token2_id == id) {
-            S = x + pool.reserve1 + pool.reserve3;
-            c = c * D / (x * 3u128);
-            c = c * D / (pool.reserve1 * 3u128);
-            c = c * D / (pool.reserve3 * 3u128);
-        }
+        c = c * D / (reserve1 * 3u128);
+        c = c * D / (reserve2 * 3u128);
+        c = c * D / (reserve3 * 3u128);
 
-        if (pool.token3_id == id) {
-            S = x + pool.reserve1 + pool.reserve2;
-            c = c * D / (x * 3u128);
-            c = c * D / (pool.reserve1 * 3u128);
-            c = c * D / (pool.reserve2 * 3u128);
+        for iter: u64 in 1u64..4u64 {
+            if id_in == iter {
+                S -= coins[iter];
+                S += x;
+                c *= coins[iter];
+                c /= x;
+            }
+            if id_out == iter {
+                S -= coins[iter];
+                c *= coins[iter] * 3u128;
+                c /= D;
+            }
         }
 
         c = c * D / (Ann * 3u128);
@@ -208,15 +205,10 @@ program stableswap3.aleo {
             y_prev = y;
             y = (y*y + c) / (2u128 * y + b - D);
         
-            if (y > y_prev) {
-                if (y - y_prev <= 1u128) {
-                    return y;
-                }
-            }
-            if (y <= y_prev) {
-                if (y_prev - y <= 1u128) {
-                    return y;
-                }
+            let tmp_res: bool = (max_u128(y, y_prev) - min_u128(y, y_prev) <= 1u128) ? true : false;
+
+            if (tmp_res) {
+                return y;
             }
         }
         return y;
@@ -295,7 +287,201 @@ program stableswap3.aleo {
         };
 
         Mapping::set(amm_pools, pool_key, pool);
+    }
+
+    transition add_liquidity(owner: address, token1: Token, token1_amount: u128, token2: Token, token2_amount: u128, token3: Token, token3_amount: u128, deposit_id: field, reserve1: u128, reserve2: u128, reserve3: u128, ampl_coef: u128) -> (Token, Token, Token, LpTokenReceipt) {
+        let token1_change_amount: u128 = token1.amount - token1_amount;
+        let token2_change_amount: u128 = token2.amount - token2_amount;
+        let token3_change_amount: u128 = token3.amount - token3_amount;
+
+        let D0: u128 = get_d(reserve1, reserve2, reserve3, ampl_coef);
+
+        let D1: u128 = get_d(reserve1 + token1_amount, reserve2 + token2_amount, reserve3 + token3_amount, ampl_coef);
+
+        assert(D1 > D0);
+
+        let D2: u128 = D1;
+
+        // let ideal_reserve1: u128 = D1 * pool.reserve1 / D0;
+        // let ideal_reserve2: u128 = D1 * pool.reserve2 / D0;
         
+        let token1_change_record: Token = Token {
+            owner: token1.owner,
+            amount: token1_change_amount,
+            token_id: token1.token_id
+        };
+
+        let token2_change_record: Token = Token {
+            owner: token2.owner,
+            amount: token2_change_amount,
+            token_id: token2.token_id
+        };
+
+        let token3_change_record: Token = Token {
+            owner: token3.owner,
+            amount: token3_change_amount,
+            token_id: token3.token_id
+        };
+
+        let lp_token_receipt: LpTokenReceipt = LpTokenReceipt {
+            owner: owner,
+            token1_id: token1.token_id,
+            token2_id: token2.token_id,
+            token3_id: token3.token_id,
+            deposit_id: deposit_id
+        };
+
+        return (token1_change_record, token2_change_record, token3_change_record, lp_token_receipt) then finalize(deposit_id, token1.token_id, token1_amount, token2.token_id, token2_amount, token3.token_id, token3_amount);
+    }
+
+    finalize add_liquidity(deposit_id: field, token1_id: u64, token1_amount: u128, token2_id: u64, token2_amount: u128, token3_id: u64, token3_amount: u128) {
+        let pool_key: field = get_pool_key(token1_id, token2_id, token3_id);
+        
+        let pool: PoolInfo = Mapping::get(amm_pools, pool_key);
+
+        let new_lp1: u128 = (token1_amount * pool.lp_total_supply) / pool.reserve1;
+        let new_lp2: u128 = (token2_amount * pool.lp_total_supply) / pool.reserve2;
+        let new_lp3: u128 = (token3_amount * pool.lp_total_supply) / pool.reserve3;
+
+        let lp: u128 = min_u128(new_lp1, min_u128(new_lp2, new_lp3));
+
+        let updated_pool: PoolInfo = PoolInfo {
+            id: pool.id,
+            token1_id: pool.token1_id,
+            token2_id: pool.token2_id,
+            token3_id: pool.token3_id,
+            swap_fee: pool.swap_fee,
+            reserve1: pool.reserve1 + token1_amount,
+            reserve2: pool.reserve2 + token2_amount,
+            reserve3: pool.reserve3 + token3_amount,
+            ampl_coef: pool.ampl_coef,
+            lp_total_supply: pool.lp_total_supply + lp,
+        };
+        Mapping::set(amm_pools, pool_key, updated_pool);
+        
+        assert(!Mapping::contains(amm_deposits, deposit_id));
+        Mapping::set(amm_deposits, deposit_id, lp);
+    }
+
+    transition remove_liquidity(receiver: address, lp_receipt: LpTokenReceipt, token1_amount: u128, token2_amount: u128, token3_amount: u128) -> (Token, Token, Token) {
+        let token1: Token = Token {
+            owner: receiver,
+            amount: token1_amount,
+            token_id: lp_receipt.token1_id
+        };
+
+        let token2: Token = Token {
+            owner: receiver,
+            amount: token2_amount,
+            token_id: lp_receipt.token2_id
+        };
+
+        let token3: Token = Token {
+            owner: receiver,
+            amount: token3_amount,
+            token_id: lp_receipt.token3_id
+        };
+
+        return (token1, token2, token3) then finalize(lp_receipt.deposit_id, 
+                lp_receipt.token1_id, lp_receipt.token2_id, lp_receipt.token3_id, token1_amount, token2_amount, token3_amount);
+    }
+
+    finalize remove_liquidity(deposit_id: field, token1_id: u64, token2_id: u64, token3_id: u64, token1_amount: u128, token2_amount: u128, token3_amount: u128) {
+        let pool_key: field = get_pool_key(token1_id, token2_id, token3_id);
+        let pool: PoolInfo = Mapping::get(amm_pools, pool_key);
+
+        let total: u128 = pool.lp_total_supply;
+
+        let deposit_amount_lp: u128 = Mapping::get(amm_deposits, deposit_id);
+        
+        let deposit_amount_1: u128 = deposit_amount_lp * pool.reserve1 / total;
+        let deposit_amount_2: u128 = deposit_amount_lp * pool.reserve2 / total;
+        let deposit_amount_3: u128 = deposit_amount_lp * pool.reserve3 / total;
+
+        // automatic underflow check ensures a user didn't request more than they have on this deposit
+        let change1: u128 = deposit_amount_1 - token1_amount;
+        let change2: u128 = deposit_amount_2 - token2_amount;
+        let change3: u128 = deposit_amount_3 - token3_amount;
+
+        let updated_pool: PoolInfo = PoolInfo {
+            id: pool.id,
+            token1_id: pool.token1_id,
+            token2_id: pool.token2_id,
+            token3_id: pool.token3_id,
+            swap_fee: pool.swap_fee,
+            reserve1: pool.reserve1 - deposit_amount_1,
+            reserve2: pool.reserve2 - deposit_amount_2,
+            reserve3: pool.reserve3 - deposit_amount_3,
+            ampl_coef: pool.ampl_coef,
+            lp_total_supply: pool.lp_total_supply - deposit_amount_lp
+        };
+        Mapping::set(amm_pools, pool_key, updated_pool);
+        Mapping::remove(amm_deposits, deposit_id);
+    }
+
+    transition exchange (receiver: address, token_in: Token, token_in_id: u64, token_out_id: u64, amount_in: u128, min_amount_out: u128, reserve1: u128, reserve2: u128, reserve3: u128,
+    token1_id: u64, token2_id: u64, token3_id: u64, ampl_coef: u128, swap_fee: u128) -> (Token, Token) {
+        assert(amount_in > 0u128);
+
+        let change_amount: u128 = token_in.amount - amount_in;
+
+        let reserve_in: u128 = token1_id == token_in_id ? reserve1 : reserve2;
+        let reserve_out: u128 = token2_id == token_in_id ? reserve1 : reserve2; // TODO: finish exchange
+        let fee: u128 = swap_fee;
+
+        let amount_in_with_fee: u128 = amount_in; // TODO: add fee 
+        let x: u128 = amount_in_with_fee + reserve_in;
+        let y: u128 = get_y(reserve1, reserve2, reserve3, ampl_coef, token_out_id, token_in_id, x);
+        
+        let dy: u128 = reserve_out - y - 1u128;
+
+        assert(dy >= min_amount_out);
+
+        let token_in_record: Token = Token {
+            owner: token_in.owner,
+            amount: change_amount,
+            token_id: token_in.token_id
+        };
+
+        let token_out_record: Token = Token {
+            owner: receiver,
+            amount: dy,
+            token_id: token_out_id
+        };
+
+        return (token_in_record, token_out_record) then finalize (reserve_in, reserve_out, token_in_id, amount_in_with_fee, token_out_id, dy);
+    }
+
+    finalize exchange(reserve_in_user: u128, reserve_out_user: u128, token_in_id: u64, amount_in: u128, token_out_id: u64, amount_out: u128) {
+        let pool_key: field = get_pool_key(token_in_id, token_out_id);
+        let pool: PoolInfo = Mapping::get(amm_pools, pool_key);
+
+        let reserve_in: u128 = pool.token1_id == token_in_id ? pool.reserve1 : pool.reserve2;
+        let reserve_out: u128 = pool.token2_id == token_in_id ? pool.reserve1 : pool.reserve2;
+
+        // let a: u128 = 1u128;
+        // let b: u128 = 2u128;
+        // let c: u128 = a - b;
+        // assert_eq(reserve_in, 1u128); 
+
+        assert(max_u128(reserve_in_user, reserve_in) - min_u128(reserve_in_user, reserve_in) < 10u128);
+        assert(max_u128(reserve_out_user, reserve_out) - min_u128(reserve_out_user, reserve_out) < 10u128);
+
+        reserve_in += amount_in;
+        reserve_out -= amount_out;
+
+        let updated_pool: PoolInfo = PoolInfo {
+            id: pool.id,
+            token1_id: pool.token1_id,
+            token2_id: pool.token2_id,
+            swap_fee: pool.swap_fee,
+            reserve1: pool.token1_id == token_in_id ? reserve_in : reserve_out,
+            reserve2: pool.token2_id == token_in_id ? reserve_in : reserve_out,
+            ampl_coef: pool.ampl_coef,
+            lp_total_supply: pool.lp_total_supply
+        };
+
+        Mapping::set(amm_pools, pool_key, updated_pool);   
     }
 
 }
