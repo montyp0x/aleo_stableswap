@@ -590,10 +590,17 @@ program stableswap.aleo {
         return (get_pool_key(1u64, 2u64), get_pool_key(1u64, 3u64), get_pool_key(2u64, 3u64), get_pool_key(2u64, 4u64));
     }
 
-    transition main (n_coins: u32) -> group {
+    transition main (n_coins: u32) -> u128 {
         let actual_token2: u32 = (5u32 > 3u32 && 3u32 > 4u32) ? 3u32 : ((3u32 > 1u32 && 1u32 > 5u32) ? 1u32 : 1u32);
+
+        let token1_id: u128 = 1u128;
+        let token2_id: u128 = 2u128;
+        let token3_id: u128 = 3u128;
+
+        let actual_amount2: u128 = (token1_id > token2_id && token2_id > token3_id) ? token2_id : ((token2_id > token1_id && token1_id > token3_id) ? token1_id : token3_id);
+
         let gr: group = group::GEN; // the group generator
-        return gr;
+        return actual_amount2;
     }
 
 }

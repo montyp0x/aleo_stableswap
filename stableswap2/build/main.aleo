@@ -21672,4 +21672,12 @@ function main:
     and r4 r5 into r6;
     ternary r6 1u32 1u32 into r7;
     ternary r3 3u32 r7 into r8;
-    output group::GEN as group.private;
+    gt 1u128 2u128 into r9;
+    gt 2u128 3u128 into r10;
+    and r9 r10 into r11;
+    gt 2u128 1u128 into r12;
+    gt 1u128 3u128 into r13;
+    and r12 r13 into r14;
+    ternary r14 1u128 3u128 into r15;
+    ternary r11 2u128 r15 into r16;
+    output r16 as u128.private;
