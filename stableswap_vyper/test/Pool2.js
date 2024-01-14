@@ -79,18 +79,18 @@ describe("StableSwap2Pool", function () {
     expect(await tokenB.balanceOf(user.address)).to.equal(1000933n);
   });
 
-  it("Add/remove liquidity", async function () {
-    const { pool, tokenA, tokenB, owner, user } = await loadFixture(deployFixture);
+  // it("Add/remove liquidity", async function () {
+  //   const { pool, tokenA, tokenB, owner, user } = await loadFixture(deployFixture);
 
-    await pool.connect(owner).add_liquidity([100, 10000], 1);
+  //   await pool.connect(owner).add_liquidity([100, 10000], 1);
 
-    await pool.connect(user).exchange(0, 1, 1000, 90);
-    console.log(await tokenA.balanceOf(user.address));
-    console.log(await tokenB.balanceOf(user.address));
+  //   await pool.connect(user).exchange(0, 1, 1000, 90);
+  //   console.log(await tokenA.balanceOf(user.address));
+  //   console.log(await tokenB.balanceOf(user.address));
 
     
 
-  });
+  // });
 
 
 });

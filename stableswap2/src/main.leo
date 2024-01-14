@@ -598,7 +598,7 @@ program stableswap.aleo {
         let token3_id: u128 = 3u128;
 
         let actual_amount2: u128 = (token1_id > token2_id && token2_id > token3_id) ? token2_id : ((token2_id > token1_id && token1_id > token3_id) ? token1_id : token3_id);
-
+ 
         let gr: group = group::GEN; // the group generator
         return actual_amount2;
     }
