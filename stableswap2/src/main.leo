@@ -130,7 +130,7 @@ program stableswap.aleo {
         let Ann: u128 = ampl_coef * 2u128;
         
 
-        for i: u8 in 0u8..255u8 {
+        for i: u8 in 0u8..8u8 {
             let D_P: u128 = D;
             D_P = D_P * D / (reserve1 * 2u128);
             D_P = D_P * D / (reserve2 * 2u128);
@@ -198,7 +198,7 @@ program stableswap.aleo {
         let y_prev: u128 = 0u128;
         let y: u128 = D;
 
-        for i: u8 in 0u8..255u8 {
+        for i: u8 in 0u8..8u8 {
             y_prev = y;
             y = (y * y + c) / (2u128 * y + b - D);
 
