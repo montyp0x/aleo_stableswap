@@ -395,7 +395,7 @@ program stableswap.aleo {
     // }
 
     transition exchange (receiver: address, token_in: Token, token_in_id: u64, token_out_id: u64, amount_in: u128, min_amount_out: u128, reserve1: u128, reserve2: u128, 
-    token1_id: u64, token2_id: u64, ampl_coef: u128, swap_fee: u128) -> (Token, Token) {
+    token1_id: u64, token2_id: u64, ampl_coef: u128, swap_fee: u128) -> (Token/*, Token*/) {
         assert(amount_in > 0u128);
 
         let change_amount: u128 = token_in.amount - amount_in;
@@ -404,13 +404,9 @@ program stableswap.aleo {
         let reserve_out: u128 = token2_id == token_in_id ? reserve1 : reserve2;
         let fee: u128 = swap_fee;
 
-        let amount_in_with_fee: u128 = amount_in; // TODO: add fee 
-        let x: u128 = amount_in_with_fee + reserve_in;
-        let y: u128 = get_y(reserve1, reserve2, ampl_coef, token1_id, token2_id, token_in_id, x);
         
-        let dy: u128 = reserve_out - y - 1u128;
-
-        assert(dy >= min_amount_out);
+        
+        
 
         let token_in_record: Token = Token {
             owner: token_in.owner,
@@ -418,32 +414,35 @@ program stableswap.aleo {
             token_id: token_in.token_id
         };
 
-        let token_out_record: Token = Token {
-            owner: receiver,
-            amount: dy,
-            token_id: token_out_id
-        };
+        // let token_out_record: Token = Token {
+        //     owner: receiver,
+        //     amount: dy,
+        //     token_id: token_out_id
+        // };
 
-        return (token_in_record, token_out_record) then finalize (reserve_in, reserve_out, token_in_id, amount_in_with_fee, token_out_id, dy);
+        return (token_in_record /*, token_out_record */) then finalize (reserve_in, reserve_out, token_in_id, token_out_id, amount_in, min_amount_out);
     }
 
-    finalize exchange(reserve_in_user: u128, reserve_out_user: u128, token_in_id: u64, amount_in: u128, token_out_id: u64, amount_out: u128) {
+    finalize exchange(reserve_in_user: u128, reserve_out_user: u128, token_in_id: u64, token_out_id: u64, amount_in: u128, min_amount_out: u128) {
         let pool_key: field = get_pool_key(token_in_id, token_out_id);
         let pool: PoolInfo = Mapping::get(amm_pools, pool_key);
 
         let reserve_in: u128 = pool.token1_id == token_in_id ? pool.reserve1 : pool.reserve2;
         let reserve_out: u128 = pool.token2_id == token_in_id ? pool.reserve1 : pool.reserve2;
 
-        // let a: u128 = 1u128;
-        // let b: u128 = 2u128;
-        // let c: u128 = a - b;
-        // assert_eq(reserve_in, 1u128); 
+        let amount_in_with_fee: u128 = amount_in; // TODO: add fee 
+        let x: u128 = amount_in_with_fee + reserve_in;
+        let y: u128 = get_y(reserve_in, reserve_out, pool.ampl_coef, pool.token1_id, pool.token2_id, token_in_id, x);
+        
+        let dy: u128 = reserve_out - y - 1u128;
+
+        assert(dy >= min_amount_out);
 
         assert(max_u128(reserve_in_user, reserve_in) - min_u128(reserve_in_user, reserve_in) < 10u128);
         assert(max_u128(reserve_out_user, reserve_out) - min_u128(reserve_out_user, reserve_out) < 10u128);
 
         reserve_in += amount_in;
-        reserve_out -= amount_out;
+        reserve_out -= dy;
 
         let updated_pool: PoolInfo = PoolInfo {
             id: pool.id,
@@ -459,137 +458,6 @@ program stableswap.aleo {
         Mapping::set(amm_pools, pool_key, updated_pool);   
     }
 
-    
-
-
-    /// ██████████████████████████████████████████████████████████████████████
-    ///                             DEMO
-    /// ██████████████████████████████████████████████████████████████████████
-
-    transition init_demo_tokens(dummy: field) -> field {
-        return (dummy + 1field) then finalize(dummy);
-    }
-
-    finalize init_demo_tokens(dummy: field) {
-        let decimals: u8 = 6u8;
-
-        Mapping::set(registered_tokens, 1u64, TokenInfo {
-             token_id: 1u64,
-             max_supply: 1000000000u128 * (10u128 ** decimals),
-             decimals,
-        });
-        Mapping::set(registered_tokens, 2u64, TokenInfo {
-             token_id: 2u64,
-             max_supply: 1000000000u128 * (10u128 ** decimals),
-             decimals,
-        });
-        Mapping::set(registered_tokens, 3u64, TokenInfo {
-             token_id: 3u64,
-             max_supply: 1000000000u128 * (10u128 ** decimals),
-             decimals,
-        });
-        Mapping::set(registered_tokens, 4u64, TokenInfo {
-             token_id: 4u64,
-             max_supply: 1000000000u128 * (10u128 ** decimals),
-             decimals,
-        });
-    }
-
-    transition init_demo_pools(dummy: field) {
-        return then finalize();
-    }
-
-    finalize init_demo_pools() {
-        let reserve1: u128 = 100000000000000u128;
-        let reserve2: u128 = 100000000000000u128;
-        let reserve3: u128 = 50000000000u128;
-        let reserve4: u128 = 500000000000u128;
-        let ampl_coef: u128 = 1000000u128;
-
-        let pool12_key: field = get_pool_key(1u64, 2u64);
-        let pool12: PoolInfo = PoolInfo {
-            id: pool12_key, // hash(token1.id, token2.id)
-            token1_id: 1u64,
-            token2_id: 2u64,
-            reserve1: reserve1,
-            reserve2: reserve2,
-            lp_total_supply: reserve1 * reserve2,
-            ampl_coef: ampl_coef,
-            swap_fee: 10u128, // 10000 based, 1 = 0.01% = 0.0001
-        };
-        assert(!Mapping::contains(amm_pools, pool12_key));
-        Mapping::set(amm_pools, pool12_key, pool12);
-
-        let pool13_key: field = get_pool_key(1u64, 3u64);
-        let pool13: PoolInfo = PoolInfo {
-            id: pool13_key,
-            token1_id: 1u64,
-            token2_id: 3u64,
-            reserve1: reserve1,
-            reserve2: reserve3,
-            lp_total_supply: reserve1 * reserve3,
-            ampl_coef: ampl_coef,
-            swap_fee: 10u128, // 10000 based, 1 = 0.01% = 0.0001
-        };
-        Mapping::set(amm_pools, pool13_key, pool13);
-
-        let pool14_key: field = get_pool_key(1u64, 4u64);
-        let pool14: PoolInfo = PoolInfo {
-            id: pool14_key,
-            token1_id: 1u64,
-            token2_id: 4u64,
-            reserve1: reserve1,
-            reserve2: reserve4,
-            lp_total_supply: reserve1 * reserve4,
-            ampl_coef: ampl_coef,
-            swap_fee: 10u128,
-        };
-        Mapping::set(amm_pools, pool14_key, pool14);
-
-        let pool23_key: field = get_pool_key(2u64, 3u64);
-        let pool23: PoolInfo = PoolInfo {
-            id: pool23_key, // hash(token1.id, token2.id)
-            token1_id: 2u64,
-            token2_id: 3u64,
-            reserve1: reserve2,
-            reserve2: reserve3,
-            lp_total_supply: reserve2 * reserve3,
-            ampl_coef: ampl_coef,
-            swap_fee: 10u128,
-        };
-        Mapping::set(amm_pools, pool23_key, pool23);
-
-        let pool24_key: field = get_pool_key(2u64, 4u64);
-        let pool24: PoolInfo = PoolInfo {
-            id: pool24_key,
-            token1_id: 2u64,
-            token2_id: 4u64,
-            reserve1: reserve2,
-            reserve2: reserve4,
-            lp_total_supply: reserve2 * reserve4,
-            ampl_coef: ampl_coef,
-            swap_fee: 10u128,
-        };
-        Mapping::set(amm_pools, pool24_key, pool24);
-
-        let pool34_key: field = get_pool_key(3u64, 4u64);
-        let pool34: PoolInfo = PoolInfo {
-            id: pool34_key,
-            token1_id: 3u64,
-            token2_id: 4u64,
-            reserve1: reserve3,
-            reserve2: reserve4,
-            lp_total_supply: reserve3 * reserve4,
-            ampl_coef: ampl_coef,
-            swap_fee: 10u128,
-        };
-        Mapping::set(amm_pools, pool34_key, pool34);
-    }
-
-    transition tmp_get_pool_id() -> (field, field, field, field) {
-        return (get_pool_key(1u64, 2u64), get_pool_key(1u64, 3u64), get_pool_key(2u64, 3u64), get_pool_key(2u64, 4u64));
-    }
-
     transition main (n_coins: u32) -> u128 {
         let actual_token2: u32 = (5u32 > 3u32 && 3u32 > 4u32) ? 3u32 : ((3u32 > 1u32 && 1u32 > 5u32) ? 1u32 : 1u32);
 
@@ -602,5 +470,4 @@ program stableswap.aleo {
         let gr: group = group::GEN; // the group generator
         return actual_amount2;
     }
-
 }
