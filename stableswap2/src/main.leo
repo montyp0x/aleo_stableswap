@@ -146,39 +146,7 @@ program stableswap.aleo {
         }
 
         return D;
-    }
-
-    // transition get_d2(reserve1: u128, reserve2: u128, ampl_coef: u128) -> u128 {
-    //     let S: u128 = reserve1 + reserve2;
-
-    //     if (S == 0u128) {   
-    //         return 0u128;
-    //     }
-
-    //     let D_prev: u128 = 0u128;
-    //     let D: u128 = S;
-    //     let Ann: u128 = ampl_coef * 2u128;
-        
-
-    //     for i: u8 in 0u8..255u8 {
-    //         let D_P: u128 = D;
-    //         D_P = D_P * D / (reserve1 * 2u128);
-    //         D_P = D_P * D / (reserve2 * 2u128);
-
-    //         D_prev = D;
-    //         D = (Ann * S + D_P * 2u128) * D / ((Ann - 1u128) * D + 3u128 * D_P);
-            
-    //         let tmp_res: bool = (max_u128(D, D_prev) - min_u128(D, D_prev) <= 1u128) ? true : false;
-
-    //         if (tmp_res) {
-    //             return D;
-    //         }
-    //     }
-
-    //     return D;
-    // }
-
-    inline get_y(reserve1: u128, reserve2: u128, ampl_coef: u128, token1_id: u64, token2_id: u64, id: u64, x: u128) -> u128 {
+    }    inline get_y(reserve1: u128, reserve2: u128, ampl_coef: u128, token1_id: u64, token2_id: u64, id: u64, x: u128) -> u128 {
         assert(token1_id != token2_id && token1_id != 0u64 && token2_id != 0u64);
         
         
@@ -378,24 +346,8 @@ program stableswap.aleo {
         Mapping::remove(amm_deposits, deposit_id);
     }
 
-    // transition debug (receiver: address, token_in: Token, token_in_id: u64, token_out_id: u64, amount_in: u128, min_amount_out: u128, reserve1: u128, reserve2: u128, 
-    // token1_id: u64, token2_id: u64, ampl_coef: u128, swap_fee: u128) -> u128 {
-    //     assert(amount_in > 0u128);
-
-    //     let change_amount: u128 = token_in.amount - amount_in;
-
-    //     let reserve_in: u128 = token1_id == token_in_id ? reserve1 : reserve2;
-    //     let reserve_out: u128 = token2_id == token_in_id ? reserve1 : reserve2;
-    //     let fee: u128 = swap_fee;
-
-    //     let amount_in_with_fee: u128 = amount_in * (10000u128 - fee); 
-    //     let x: u128 = amount_in_with_fee + reserve_in;
-
-    //     return reserve;
-    // }
-
     transition exchange (receiver: address, token_in: Token, token_in_id: u64, token_out_id: u64, amount_in: u128, min_amount_out: u128, reserve1: u128, reserve2: u128, 
-    token1_id: u64, token2_id: u64, ampl_coef: u128, swap_fee: u128) -> (Token/*, Token*/) {
+    token1_id: u64, token2_id: u64, ampl_coef: u128, swap_fee: u128) -> (Token, Token) {
         assert(amount_in > 0u128);
 
         let change_amount: u128 = token_in.amount - amount_in;
@@ -404,9 +356,13 @@ program stableswap.aleo {
         let reserve_out: u128 = token2_id == token_in_id ? reserve1 : reserve2;
         let fee: u128 = swap_fee;
 
+        let amount_in_with_fee: u128 = amount_in; // TODO: add fee 
+        let x: u128 = amount_in_with_fee + reserve_in;
+        let y: u128 = get_y(reserve1, reserve2, ampl_coef, token1_id, token2_id, token_in_id, x);
         
-        
-        
+        let dy: u128 = reserve_out - y - 1u128;
+
+        assert(dy >= min_amount_out);
 
         let token_in_record: Token = Token {
             owner: token_in.owner,
@@ -414,35 +370,32 @@ program stableswap.aleo {
             token_id: token_in.token_id
         };
 
-        // let token_out_record: Token = Token {
-        //     owner: receiver,
-        //     amount: dy,
-        //     token_id: token_out_id
-        // };
+        let token_out_record: Token = Token {
+            owner: receiver,
+            amount: dy,
+            token_id: token_out_id
+        };
 
-        return (token_in_record /*, token_out_record */) then finalize (reserve_in, reserve_out, token_in_id, token_out_id, amount_in, min_amount_out);
+        return (token_in_record, token_out_record) then finalize (reserve_in, reserve_out, token_in_id, amount_in_with_fee, token_out_id, dy);
     }
 
-    finalize exchange(reserve_in_user: u128, reserve_out_user: u128, token_in_id: u64, token_out_id: u64, amount_in: u128, min_amount_out: u128) {
+    finalize exchange(reserve_in_user: u128, reserve_out_user: u128, token_in_id: u64, amount_in: u128, token_out_id: u64, amount_out: u128) {
         let pool_key: field = get_pool_key(token_in_id, token_out_id);
         let pool: PoolInfo = Mapping::get(amm_pools, pool_key);
 
         let reserve_in: u128 = pool.token1_id == token_in_id ? pool.reserve1 : pool.reserve2;
         let reserve_out: u128 = pool.token2_id == token_in_id ? pool.reserve1 : pool.reserve2;
 
-        let amount_in_with_fee: u128 = amount_in; // TODO: add fee 
-        let x: u128 = amount_in_with_fee + reserve_in;
-        let y: u128 = get_y(reserve_in, reserve_out, pool.ampl_coef, pool.token1_id, pool.token2_id, token_in_id, x);
-        
-        let dy: u128 = reserve_out - y - 1u128;
-
-        assert(dy >= min_amount_out);
+        // let a: u128 = 1u128;
+        // let b: u128 = 2u128;
+        // let c: u128 = a - b;
+        // assert_eq(reserve_in, 1u128); 
 
         assert(max_u128(reserve_in_user, reserve_in) - min_u128(reserve_in_user, reserve_in) < 10u128);
         assert(max_u128(reserve_out_user, reserve_out) - min_u128(reserve_out_user, reserve_out) < 10u128);
 
         reserve_in += amount_in;
-        reserve_out -= dy;
+        reserve_out -= amount_out;
 
         let updated_pool: PoolInfo = PoolInfo {
             id: pool.id,
@@ -458,6 +411,7 @@ program stableswap.aleo {
         Mapping::set(amm_pools, pool_key, updated_pool);   
     }
 
+    
     transition main (n_coins: u32) -> u128 {
         let actual_token2: u32 = (5u32 > 3u32 && 3u32 > 4u32) ? 3u32 : ((3u32 > 1u32 && 1u32 > 5u32) ? 1u32 : 1u32);
 
@@ -470,4 +424,5 @@ program stableswap.aleo {
         let gr: group = group::GEN; // the group generator
         return actual_amount2;
     }
+
 }
