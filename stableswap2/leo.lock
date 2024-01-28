@@ -1,0 +1,6 @@
+[[package]]
+name = "arcanetoken"
+location = "local"
+path = "./dependencies/arcanetoken"
+checksum = "3b5c810515b5176bbe7a17f058338cd3dcb5de2ee45b0f9ef4cd212880c1da37"
+dependencies = []

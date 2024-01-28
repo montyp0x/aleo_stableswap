@@ -21,6 +21,15 @@ program arcanetoken.aleo {
     mapping arcane_registered_tokens: u64 => ArcaneTokenInfo;
     mapping arcane_balances: field => u128;
 
+    //===================STABLESWAP METHODS==============
+
+    transition get_token_info (token: ArcaneToken) -> (address, u64, u128) {
+        return (token.owner, token.token_id, token.amount);
+    }
+
+
+    //==========================END======================
+
     inline get_balance_key(token_id: u64, addr: address) -> field {
         return BHP256::hash_to_field(BalanceKey {token_id: token_id, addr: addr});
     }

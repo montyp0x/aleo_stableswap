@@ -1,7 +1,6 @@
-import credits.leo;
-import arcanetoken.leo;
+import arcanetoken.aleo;
 
-program stableswap.aleo {
+program stableswap2.aleo {
 
     const SELF_ADDRESS: address = aleo1hy8w46tflux7zwpeaw8ny7tq6wkzqux40z75a9ah3q9tqa4t758qltkqu7;
 
@@ -137,11 +136,20 @@ program stableswap.aleo {
         return y;
     }
 
-    transition create_pool(owner: address, token1: arcanetoken.leo/ArcaneToken, initial_amount1: u128, token2: arcanetoken.leo/ArcaneToken, initial_amount2: u128, ampl_coef: u128, swap_fee: u128) -> (PoolAdmin, arcanetoken.leo/ArcaneToken, arcanetoken.leo/ArcaneToken) {
+    transition create_pool(owner: address, token1: arcanetoken.aleo/ArcaneToken, initial_amount1: u128, token2: arcanetoken.aleo/ArcaneToken, initial_amount2: u128, ampl_coef: u128, swap_fee: u128) -> (PoolAdmin, arcanetoken.aleo/ArcaneToken, arcanetoken.aleo/ArcaneToken) {
         assert(initial_amount1 > 0u128 && initial_amount2 > 0u128);
         assert(swap_fee <= 10000u128); // 10000 based, 1 = 0.01% = 0.0001
         assert(token1.token_id != token2.token_id);
         assert(token1.amount >= initial_amount1 && token2.amount >= initial_amount2);
+
+        // let token1_info: (address, u64, u128) = arcanetoken.aleo/get_token_info(token1);
+        // let token2_info: (address, u64, u128) = arcanetoken.aleo/get_token_info(token2);
+
+        // let actual_token1: ArcaneToken = token1_info.1 > token2_info.1 ? token2 : token1;
+        // let actual_token2: ArcaneToken = token1_info.1 < token2_info.1 ? token2 : token1;
+
+        // let actual_amount1: u128 = token1_info.1 > token2_info.1 ? initial_amount2 : initial_amount1;
+        // let actual_amount2: u128 = token1_info.1 < token2_info.1 ? initial_amount2 : initial_amount1;
 
         let actual_token1: ArcaneToken = token1.token_id > token2.token_id ? token2 : token1;
         let actual_token2: ArcaneToken = token1.token_id < token2.token_id ? token2 : token1;
@@ -149,10 +157,9 @@ program stableswap.aleo {
         let actual_amount1: u128 = token1.token_id > token2.token_id ? initial_amount2 : initial_amount1;
         let actual_amount2: u128 = token1.token_id < token2.token_id ? initial_amount2 : initial_amount1;
 
-        let change1: ArcaneToken = arcanetoken.leo/transfer_private_to_public_arc(actual_token1, SELF_ADDRESS, actual_amount1);
-        let change2: ArcaneToken = arcanetoken.leo/transfer_private_to_public_arc(actual_token2, SELF_ADDRESS, actual_amount2);
+        let change1: ArcaneToken = arcanetoken.aleo/transfer_private_to_public_arc(actual_token1, SELF_ADDRESS, actual_amount1);
+        let change2: ArcaneToken = arcanetoken.aleo/transfer_private_to_public_arc(actual_token2, SELF_ADDRESS, actual_amount2);
 
-        
         
         let pool_key: field = get_pool_key(actual_token1.token_id, actual_token2.token_id);
         let pool_admin: PoolAdmin = PoolAdmin {
@@ -189,7 +196,7 @@ program stableswap.aleo {
         };
     }
 
-    transition add_liquidity(owner: address, token1: arcanetoken.leo/ArcaneToken, token1_amount: u128, token2: arcanetoken.leo/ArcaneToken, token2_amount: u128, deposit_id: field, reserve1: u128, reserve2: u128, ampl_coef: u128) -> (arcanetoken.leo/ArcaneToken, arcanetoken.leo/ArcaneToken, LpTokenReceipt) {
+    transition add_liquidity(owner: address, token1: arcanetoken.aleo/ArcaneToken, token1_amount: u128, token2: arcanetoken.aleo/ArcaneToken, token2_amount: u128, deposit_id: field, reserve1: u128, reserve2: u128, ampl_coef: u128) -> (arcanetoken.aleo/ArcaneToken, arcanetoken.aleo/ArcaneToken, LpTokenReceipt) {
         let token1_change_amount: u128 = token1.amount - token1_amount;
         let token2_change_amount: u128 = token2.amount - token2_amount;
 
@@ -252,7 +259,7 @@ program stableswap.aleo {
         Mapping::set(amm_deposits, deposit_id, lp);
     }
     
-    transition remove_liquidity(receiver: address, lp_receipt: LpTokenReceipt, token1_amount: u128, token2_amount: u128) -> (arcanetoken.leo/ArcaneToken, arcanetoken.leo/ArcaneToken) {
+    transition remove_liquidity(receiver: address, lp_receipt: LpTokenReceipt, token1_amount: u128, token2_amount: u128) -> (arcanetoken.aleo/ArcaneToken, arcanetoken.aleo/ArcaneToken) {
         let token1: ArcaneToken = ArcaneToken {
             owner: receiver,
             amount: token1_amount,
@@ -297,8 +304,8 @@ program stableswap.aleo {
         Mapping::remove(amm_deposits, deposit_id);
     }
 
-    transition exchange (receiver: address, token_in: arcanetoken.leo/ArcaneToken, token_in_id: u64, token_out_id: u64, amount_in: u128, min_amount_out: u128, reserve1: u128, reserve2: u128, 
-    token1_id: u64, token2_id: u64, ampl_coef: u128, swap_fee: u128) -> (arcanetoken.leo/ArcaneToken, arcanetoken.leo/ArcaneToken) {
+    transition exchange (receiver: address, token_in: arcanetoken.aleo/ArcaneToken, token_in_id: u64, token_out_id: u64, amount_in: u128, min_amount_out: u128, reserve1: u128, reserve2: u128, 
+    token1_id: u64, token2_id: u64, ampl_coef: u128, swap_fee: u128) -> (arcanetoken.aleo/ArcaneToken, arcanetoken.aleo/ArcaneToken) {
         assert(amount_in > 0u128);
 
         let change_amount: u128 = token_in.amount - amount_in;

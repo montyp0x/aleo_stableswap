@@ -1,6 +1,14 @@
 {
-    "program": "stableswap.aleo",
+    "program": "stableswap2.aleo",
     "version": "0.0.0",
     "description": "",
-    "license": "MIT"
+    "license": "MIT",
+    "dependencies": [
+        {
+            "name": "arcanetoken.aleo",
+            "location": "local",
+            "path": "dependencies/arcanetoken"
+        }
+    ]
 }
+

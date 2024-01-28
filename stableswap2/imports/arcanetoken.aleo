@@ -25,13 +25,6 @@ mapping arcane_balances:
 	key as field.public;
 	value as u128.public;
 
-function get_token_info:
-    input r0 as ArcaneToken.record;
-    output r0.owner as address.private;
-    output r0.token_id as u64.private;
-    output r0.amount as u128.private;
-
-
 
 
 function create_arcane_token:

@@ -1,7 +1,5 @@
-import credits.aleo;
 import arcanetoken.aleo;
-program stableswap.aleo;
-
+program stableswap2.aleo;
 
 
 
@@ -106,7 +104,7 @@ function create_pool:
     output r39 as PoolAdmin.record;
     output r29 as arcanetoken.aleo/ArcaneToken.record;
     output r31 as arcanetoken.aleo/ArcaneToken.record;
-    output r40 as stableswap.aleo/create_pool.future;
+    output r40 as stableswap2.aleo/create_pool.future;
 
 finalize create_pool:
     input r0 as arcanetoken.aleo/transfer_private_to_public_arc.future;
@@ -536,7 +534,7 @@ function add_liquidity:
     output r390 as arcanetoken.aleo/ArcaneToken.record;
     output r391 as arcanetoken.aleo/ArcaneToken.record;
     output r392 as LpTokenReceipt.record;
-    output r393 as stableswap.aleo/add_liquidity.future;
+    output r393 as stableswap2.aleo/add_liquidity.future;
 
 finalize add_liquidity:
     input r0 as field.public;
@@ -578,7 +576,7 @@ function remove_liquidity:
     async remove_liquidity r1.deposit_id r1.token1_id r1.token2_id r2 r3 into r6;
     output r4 as arcanetoken.aleo/ArcaneToken.record;
     output r5 as arcanetoken.aleo/ArcaneToken.record;
-    output r6 as stableswap.aleo/remove_liquidity.future;
+    output r6 as stableswap2.aleo/remove_liquidity.future;
 
 finalize remove_liquidity:
     input r0 as field.public;
@@ -953,7 +951,7 @@ function exchange:
     async exchange r15 r17 r2 r4 r3 r334 into r338;
     output r336 as arcanetoken.aleo/ArcaneToken.record;
     output r337 as arcanetoken.aleo/ArcaneToken.record;
-    output r338 as stableswap.aleo/exchange.future;
+    output r338 as stableswap2.aleo/exchange.future;
 
 finalize exchange:
     input r0 as u128.public;
