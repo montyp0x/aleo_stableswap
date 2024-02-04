@@ -341,7 +341,7 @@ program stableswap2.aleo {
 
         assert(dy >= min_amount_out);
 
-        let token_in_record: ArcaneToken = arcanetoken.aleo/transfer_private_to_public_arc(token_in, SELF_ADDRESS, change_amount);
+        let token_in_record: ArcaneToken = arcanetoken.aleo/transfer_private_to_public_arc(token_in, SELF_ADDRESS, amount_in_with_fee);
         let token_out_record: ArcaneToken = arcanetoken.aleo/transfer_public_to_private_arc(token_out_id, receiver, dy);
 
 
@@ -380,13 +380,15 @@ program stableswap2.aleo {
     /// ██████████████████████████████████████████████████████████████████████
 
     transition create_pool_pric(owner: address, 
-                                token1: credits.aleo/credits, 
-                                initial_amount1: u64, 
-                                token2: arcanetoken.aleo/ArcaneToken, 
-                                initial_amount2: u128, 
-                                swap_fee: u128) -> (PoolAdmin, credits.aleo/credits, arcanetoken.aleo/ArcaneToken) {
+                          token1: credits.aleo/credits,
+                          initial_amount1: u64, 
+                          token2: arcanetoken.aleo/ArcaneToken, 
+                          initial_amount2: u128, 
+                          ampl_coef: u128, 
+                          swap_fee: u128) -> (PoolAdmin, credits.aleo/credits, arcanetoken.aleo/ArcaneToken) {
+
         assert(initial_amount1 > 0u64 && initial_amount2 > 0u128);
-        assert(swap_fee <= 10000u128); // 10000 based, 1 = 0.01% = 0.0001
+        assert(swap_fee <= 10000u128 && ampl_coef >= 0u128); // 10000 based, 1 = 0.01% = 0.0001
         assert(token1.microcredits >= initial_amount1 && token2.amount >= initial_amount2);
 
         let change1: credits = credits.aleo/transfer_private_to_public(token1, SELF_ADDRESS, initial_amount1);
@@ -398,10 +400,18 @@ program stableswap2.aleo {
             pool_key: pool_key
         };
 
-        return (pool_admin, change1, change2) then finalize(pool_key, 0u64, initial_amount1 as u128, token2.token_id, initial_amount2, swap_fee);
+        return (pool_admin, change1, change2) then finalize(pool_key, 0u64, initial_amount1 as u128, token2.token_id, initial_amount2, ampl_coef, swap_fee);
     }
 
-    finalize create_pool_pric(pool_key: field, token1_id: u64, token1_amount: u128, token2_id: u64, token2_amount: u128, swap_fee: u128) {
+
+    finalize create_pool_pric(pool_key: field, 
+                            token1_id: u64, 
+                            token1_amount: u128,
+                            token2_id: u64, 
+                            token2_amount: u128, 
+                            ampl_coef: u128, 
+                            swap_fee: u128) {
+
         assert (!Mapping::contains(amm_pools, pool_key)); // the pool already exists
 
         let pool: PoolInfo = PoolInfo {
@@ -411,6 +421,7 @@ program stableswap2.aleo {
             reserve1: token1_amount,
             reserve2: token2_amount,
             lp_total_supply: token1_amount * token2_amount,
+            ampl_coef: ampl_coef,
             swap_fee: swap_fee, // 10000 based, 1 = 0.01% = 0.0001
         };
 
@@ -418,6 +429,293 @@ program stableswap2.aleo {
     }
 
 
+    transition add_amm_liquidity_pric(owner: address, 
+                                      token1: credits.aleo/credits, 
+                                      token1_amount: u64, 
+                                      token2: arcanetoken.aleo/ArcaneToken, 
+                                      token2_amount: u128, 
+                                      deposit_id: field,
+                                      reserve1: u128, 
+                                      reserve2: u128, 
+                                      ampl_coef: u128) -> (credits.aleo/credits, arcanetoken.aleo/ArcaneToken, LpTokenReceipt) {
+
+        let D0: u128 = get_d(reserve1, reserve2, ampl_coef);
+
+        let D1: u128 = get_d(reserve1 + token1_amount as u128, reserve2 + token2_amount, ampl_coef);
+
+        assert(D1 > D0);
+
+        let D2: u128 = D1;
+
+        // let ideal_reserve1: u128 = D1 * pool.reserve1 / D0; TODO: ideal reserve
+        // let ideal_reserve2: u128 = D1 * pool.reserve2 / D0;
+        
+        let token1_change_record: credits = credits.aleo/transfer_private_to_public(token1, SELF_ADDRESS, token1_amount);
+        let token2_change_record: ArcaneToken = arcanetoken.aleo/transfer_private_to_public_arc(token2, SELF_ADDRESS, token2_amount);
+
+        let lp_token_receipt: LpTokenReceipt = LpTokenReceipt {
+            owner: owner,
+            token1_id: 0u64,
+            token2_id: token2.token_id,
+            deposit_id: deposit_id
+        };
+
+        return (token1_change_record, token2_change_record, lp_token_receipt) then finalize(deposit_id, token1_amount as u128, token2.token_id, token2_amount);
+    }
+
+    finalize add_amm_liquidity_pric(deposit_id: field, token1_amount: u128, token2_id: u64, token2_amount: u128) {
+        let token1_id: u64 = 0u64;
+        let pool_key: field = get_pool_key(token1_id, token2_id);
+        
+        let pool: PoolInfo = Mapping::get(amm_pools, pool_key);
+
+        let new_lp1: u128 = (token1_amount * pool.lp_total_supply) / pool.reserve1;
+        let new_lp2: u128 = (token2_amount * pool.lp_total_supply) / pool.reserve2;
+
+        let lp: u128 = min_u128(new_lp1, new_lp2);
+
+        let updated_pool: PoolInfo = PoolInfo {
+            id: pool.id,
+            token1_id: pool.token1_id,
+            token2_id: pool.token2_id,
+            swap_fee: pool.swap_fee,
+            reserve1: pool.reserve1 + token1_amount,
+            reserve2: pool.reserve2 + token2_amount,
+            ampl_coef: pool.ampl_coef,
+            lp_total_supply: pool.lp_total_supply + lp,
+        };
+        Mapping::set(amm_pools, pool_key, updated_pool);
+        
+        assert(!Mapping::contains(amm_deposits, deposit_id));
+        Mapping::set(amm_deposits, deposit_id, lp);
+    }
+
+    transition remove_amm_liquidity_pric(receiver: address, 
+                                        lp_receipt: LpTokenReceipt, 
+                                        token1_amount: u64, 
+                                        token2_amount: u128, 
+                                        /*extra_voucher1: field, 
+                                        extra_voucher2: field*/) -> (credits.aleo/credits, arcanetoken.aleo/ArcaneToken/*, ExtraAmountVoucher, ExtraAmountVoucher*/) {
+        // assert(extra_voucher1 != extra_voucher2);
+
+        let token1: credits = credits.aleo/transfer_public_to_private(receiver, token1_amount);
+        let token2: ArcaneToken = arcanetoken.aleo/transfer_public_to_private_arc(lp_receipt.token2_id, receiver, token2_amount);
+
+        // let extra_amount_voucher1: ExtraAmountVoucher = ExtraAmountVoucher {
+        //     owner: receiver,
+        //     token_id: lp_receipt.token1_id,
+        //     voucher: extra_voucher1
+        // };
+        // let extra_amount_voucher2: ExtraAmountVoucher = ExtraAmountVoucher {
+        //     owner: receiver,
+        //     token_id: lp_receipt.token2_id,
+        //     voucher: extra_voucher2
+        // };
+
+        return (token1, token2, /* extra_amount_voucher1, extra_amount_voucher2 */) then finalize(lp_receipt.deposit_id, 
+                lp_receipt.token1_id, lp_receipt.token2_id, token1_amount as u128, token2_amount/*, extra_voucher1, extra_voucher2 */);
+    }
+
+    finalize remove_amm_liquidity_pric(deposit_id: field, 
+                                       token1_id: u64, 
+                                       token2_id: u64, 
+                                       token1_amount: u128, 
+                                       token2_amount: u128, 
+                                       /*extra_voucher1: field, 
+                                       extra_voucher2: field */) {
+
+        let pool_key: field = get_pool_key(token1_id, token2_id);
+        let pool: PoolInfo = Mapping::get(amm_pools, pool_key);
+
+        let total: u128 = pool.lp_total_supply;
+
+        let deposit_amount_lp: u128 = Mapping::get(amm_deposits, deposit_id);
+        
+        let deposit_amount_1: u128 = deposit_amount_lp * pool.reserve1 / total;
+        let deposit_amount_2: u128 = deposit_amount_lp * pool.reserve2 / total;
+
+        // automatic underflow check ensures a user didn't request more than they have on this deposit
+        let change1: u128 = deposit_amount_1 - token1_amount;
+        let change2: u128 = deposit_amount_2 - token2_amount;
+
+        // assert (!Mapping::contains(amm_extras, extra_voucher1)); // check if voucher1 is already in use
+        // Mapping::set(amm_extras, extra_voucher1, ExtraAmount {
+        //     token_id: token1_id,
+        //     token_amount: change1
+        // });
+
+        // assert (!Mapping::contains(amm_extras, extra_voucher2)); // check if voucher2 is already in use
+        // Mapping::set(amm_extras, extra_voucher2, ExtraAmount {
+        //     token_id: token2_id,
+        //     token_amount: change2
+        // });
+
+        let updated_pool: PoolInfo = PoolInfo {
+            id: pool.id,
+            token1_id: pool.token1_id,
+            token2_id: pool.token2_id,
+            swap_fee: pool.swap_fee,
+            reserve1: pool.reserve1 - deposit_amount_1,
+            reserve2: pool.reserve2 - deposit_amount_2,
+            ampl_coef: pool.ampl_coef,
+            lp_total_supply: pool.lp_total_supply - deposit_amount_lp
+        };
+        Mapping::set(amm_pools, pool_key, updated_pool);
+        Mapping::remove(amm_deposits, deposit_id);
+    }
+
+    transition swap_amm_pric_in(receiver: address, 
+                                token_in: credits.aleo/credits, 
+                                amount_in: u64,
+                                reserve_in: u128,
+                                token_out_id: u64, 
+                                min_amount_out: u128, 
+                                reserve_out: u128,
+                                ampl_coef: u128,
+                                /* extra_voucher: field */) -> (credits.aleo/credits, arcanetoken.aleo/ArcaneToken /*, ExtraAmountVoucher */) {
+        
+        assert(min_amount_out > 0u128);
+        assert(amount_in > 0u64);
+
+        // let change_amount: u128 = token_in.amount - amount_in as u128;
+        
+        let amount_in_with_fee: u64 = amount_in; // TODO: add fee 
+        let x: u128 = amount_in_with_fee as u128 + reserve_in;
+        let y: u128 = get_y(reserve_in, reserve_out, ampl_coef, 0u64, token_out_id, 0u64, x);
+        
+        let dy: u128 = reserve_out - y - 1u128;
+
+        assert(dy >= min_amount_out);
+
+        let token_in_record: credits = credits.aleo/transfer_private_to_public(token_in, SELF_ADDRESS, amount_in_with_fee);
+        let token_out_record: ArcaneToken = arcanetoken.aleo/transfer_public_to_private_arc(token_out_id, receiver, dy);
+
+
+        // user can get change using this voucher if amount_out is less than actual amount they could receive according to AMM math
+        // let extra_amount_voucher: ExtraAmountVoucher = ExtraAmountVoucher {
+        //     owner: receiver,
+        //     token_id: token_out_id,
+        //     voucher: extra_voucher
+        // };
+
+        return (token_in_record, token_out_record,/* extra_amount_voucher */) then finalize(reserve_in, reserve_out, amount_in as u128, token_out_id, dy/*, extra_voucher*/);
+    }
+
+    finalize swap_amm_pric_in(reserve_in_user: u128, 
+                              reserve_out_user: u128,
+                              amount_in: u128, 
+                              token_out_id: u64, 
+                              amount_out: u128, 
+                              /*extra_change_voucher: field*/) {
+        
+        let token_in_id: u64 = 0u64;
+        
+        let pool_key: field = get_pool_key(token_in_id, token_out_id);
+        let pool: PoolInfo = Mapping::get(amm_pools, pool_key);
+
+        let total: u128 = pool.lp_total_supply;
+
+        let reserve_in: u128 = pool.token1_id == token_in_id ? pool.reserve1 : pool.reserve2;
+        let reserve_out: u128 = pool.token2_id == token_in_id ? pool.reserve1 : pool.reserve2;
+
+        assert(max_u128(reserve_in_user, reserve_in) - min_u128(reserve_in_user, reserve_in) < 10u128);
+        assert(max_u128(reserve_out_user, reserve_out) - min_u128(reserve_out_user, reserve_out) < 10u128);
+
+        let fee: u128 = pool.swap_fee;
+
+
+        reserve_in += amount_in;
+        reserve_out -= amount_out;
+
+        let updated_pool: PoolInfo = PoolInfo {
+            id: pool.id,
+            token1_id: pool.token1_id,
+            token2_id: pool.token2_id,
+            swap_fee: pool.swap_fee,
+            reserve1: pool.token1_id == token_in_id ? reserve_in : reserve_out,
+            reserve2: pool.token2_id == token_in_id ? reserve_in : reserve_out,
+            ampl_coef: pool.ampl_coef,
+            lp_total_supply: pool.lp_total_supply
+        };
+
+        Mapping::set(amm_pools, pool_key, updated_pool);   
+    }
+
+    
+    transition swap_amm_pric_out(receiver: address, 
+                                token_in: arcanetoken.aleo/ArcaneToken, 
+                                amount_in: u128, 
+                                reserve_in: u128,
+                                reserve_out: u64,
+                                min_amount_out: u64, 
+                                ampl_coef: u128,
+                                swap_fee: u128,
+                                /*extra_voucher: field*/) -> (arcanetoken.aleo/ArcaneToken, credits.aleo/credits/*, ExtraAmountVoucher*/) {
+
+        assert(min_amount_out > 0u64);
+
+        let change_amount: u128 = token_in.amount - amount_in;
+
+        let fee: u128 = swap_fee;
+
+        let amount_in_with_fee: u128 = amount_in; // TODO: add fee 
+        let x: u128 = amount_in_with_fee + reserve_in;
+        let y: u128 = get_y(reserve_in, reserve_out as u128, ampl_coef, token_in.token_id, 0u64, token_in.token_id, x);
+        
+        let dy: u128 = reserve_out as u128 - y - 1u128;
+
+        assert(dy >= min_amount_out as u128);
+
+        let token_in_record: ArcaneToken = arcanetoken.aleo/transfer_private_to_public_arc(token_in, SELF_ADDRESS, amount_in);
+        let token_out_record: credits = credits.aleo/transfer_public_to_private(receiver, dy as u64);
+
+        // user can get change using this voucher if amount_out is less than actual amount they could receive according to AMM math
+        // let extra_amount_voucher: ExtraAmountVoucher = ExtraAmountVoucher {
+        //     owner: receiver,
+        //     token_id: 0u64,
+        //     voucher: extra_voucher
+        // };
+
+        return (token_in_record, token_out_record, /*extra_amount_voucher*/) then finalize(reserve_in, reserve_out as u128, token_in.token_id, amount_in, dy/*, extra_voucher*/);
+    }
+
+    finalize swap_amm_pric_out(reserve_in_user: u128, 
+                              reserve_out_user: u128,
+                              token_in_id: u64, 
+                              amount_in: u128, 
+                              amount_out: u128, 
+                              /*extra_change_voucher: field*/) {
+
+        let token_out_id: u64 = 0u64;
+        
+        let pool_key: field = get_pool_key(token_in_id, token_out_id);
+        let pool: PoolInfo = Mapping::get(amm_pools, pool_key);
+
+        let total: u128 = pool.lp_total_supply;
+
+        let reserve_in: u128 = pool.token1_id == token_in_id ? pool.reserve1 : pool.reserve2;
+        let reserve_out: u128 = pool.token2_id == token_in_id ? pool.reserve1 : pool.reserve2;
+
+        assert(max_u128(reserve_in_user, reserve_in) - min_u128(reserve_in_user, reserve_in) < 10u128);
+        assert(max_u128(reserve_out_user, reserve_out) - min_u128(reserve_out_user, reserve_out) < 10u128);
+
+
+        reserve_in += amount_in;
+        reserve_out -= amount_out;
+
+        let updated_pool: PoolInfo = PoolInfo {
+            id: pool.id,
+            token1_id: pool.token1_id,
+            token2_id: pool.token2_id,
+            swap_fee: pool.swap_fee,
+            reserve1: pool.token1_id == token_in_id ? reserve_in : reserve_out,
+            reserve2: pool.token2_id == token_in_id ? reserve_in : reserve_out,
+            ampl_coef: pool.ampl_coef,
+            lp_total_supply: pool.lp_total_supply
+        };
+
+        Mapping::set(amm_pools, pool_key, updated_pool);   
+    }
 
     
     transition main (n_coins: u32) -> u128 {
