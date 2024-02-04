@@ -1,6 +1,13 @@
 [[package]]
 name = "arcanetoken"
 location = "local"
-path = "./dependencies/arcanetoken"
-checksum = "3b5c810515b5176bbe7a17f058338cd3dcb5de2ee45b0f9ef4cd212880c1da37"
+path = "dependencies/arcanetoken"
+checksum = "4ece60a393ecb380e482f65d81f5c8457c07813ae294d1992115fb93be3de662"
+dependencies = []
+
+[[package]]
+name = "credits"
+location = "local"
+path = "dependencies/credits"
+checksum = "18b7f9fe8dc2f6f4134ac415b800e0d8a69969e7f30152ef8d740a15ba67f8b6"
 dependencies = []

@@ -8,6 +8,11 @@
             "name": "arcanetoken.aleo",
             "location": "local",
             "path": "dependencies/arcanetoken"
+        },
+        {
+            "name": "credits.aleo",
+            "location": "local",
+            "path": "dependencies/credits"
         }
     ]
 }
